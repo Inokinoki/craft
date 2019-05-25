@@ -126,6 +126,12 @@ class MacDylibBundler(object):
         assert libPath.is_absolute(), libPath
         libBasename = libPath.name
         targetPath = Path(self.appPath, "Contents/Frameworks/", libBasename)
+
+        # Handle dylib in framework
+        if f"{libPath.name}.framework" in str(libPath):
+            libBasename = str(libPath)[str(libPath).find(f"{libPath.name}.framework"):]
+            CraftCore.log.info("Lib in framework found %s", libBasename)
+
         if targetPath.exists() and targetPath in self.checkedLibs:
             return True
         # Handle symlinks (such as libgit2.27.dylib -> libgit2.0.27.4.dylib):
@@ -161,8 +167,15 @@ class MacDylibBundler(object):
             return False
         CraftCore.log.debug("Handling library dependency '%s'", libPath)
         if not targetPath.exists():
-            utils.copyFile(str(libPath), str(targetPath), linkOnly=False)
-            CraftCore.log.info("Added library dependency '%s' to bundle -> %s", libPath, targetPath)
+            if f"{libPath.name}.framework" in str(libPath):
+                # Copy the framework of dylib
+                frameworkPath = str(libPath)[:(str(libPath).find(".framework") + len(".framework"))]
+                frameworkTargetPath = str(targetPath)[:(str(targetPath).find(".framework") + len(".framework"))]
+                utils.copyDir(frameworkPath, frameworkTargetPath, linkOnly=False)
+                CraftCore.log.info("Added library dependency '%s' to bundle -> %s", frameworkPath, frameworkTargetPath)
+            else:
+                utils.copyFile(str(libPath), str(targetPath), linkOnly=False)
+                CraftCore.log.info("Added library dependency '%s' to bundle -> %s", libPath, targetPath)
 
         if not self._fixupLibraryId(targetPath):
             return False
@@ -185,7 +198,12 @@ class MacDylibBundler(object):
     @staticmethod
     def _updateLibraryReference(fileToFix: Path, oldRef: str, newRef: str = None) -> bool:
         if newRef is None:
-            newRef = "@executable_path/../Frameworks/" + os.path.basename(oldRef)
+            basename = os.path.basename(oldRef)
+            if f"{basename}.framework" in oldRef:
+                # Update dylib in framework
+                newRef = "@executable_path/../Frameworks/" + oldRef[oldRef.find(f"{basename}.framework"):]
+            else:
+                newRef = "@executable_path/../Frameworks/" + basename
         with utils.makeWritable(fileToFix):
             if not utils.system(["install_name_tool", "-change", oldRef, newRef, str(fileToFix)], logCommand=False):
                 CraftCore.log.error("%s: failed to update library dependency path from '%s' to '%s'",
