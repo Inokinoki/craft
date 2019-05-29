@@ -125,13 +125,13 @@ class MacDylibBundler(object):
     def _addLibToAppImage(self, libPath: Path) -> bool:
         assert libPath.is_absolute(), libPath
         libBasename = libPath.name
-        targetPath = Path(self.appPath, "Contents/Frameworks/", libBasename)
 
         # Handle dylib in framework
         if f"{libPath.name}.framework" in str(libPath):
             libBasename = str(libPath)[str(libPath).find(f"{libPath.name}.framework"):]
             CraftCore.log.info("Lib in framework found %s", libBasename)
 
+        targetPath = Path(self.appPath, "Contents/Frameworks/", libBasename)
         if targetPath.exists() and targetPath in self.checkedLibs:
             return True
         # Handle symlinks (such as libgit2.27.dylib -> libgit2.0.27.4.dylib):
