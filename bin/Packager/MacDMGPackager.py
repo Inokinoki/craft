@@ -74,7 +74,11 @@ class MacDMGPackager( CollectionPackagerBase ):
             if not dylibbundler.fixupAndBundleLibsRecursively("Contents/PlugIns"):
                 return False
 
-            if not utils.system(["macdeployqt", appPath, "-always-overwrite", "-verbose=1"]):
+            macdeployqt_multiple_executables_command = ["macdeployqt", appPath, "-always-overwrite", "-verbose=1"]
+            for binary in binaries:
+                binaryPath = Path(appPath, "Contents", "MacOS", binary)
+                macdeployqt_multiple_executables_command.append(f"-executable={binaryPath}")
+            if not utils.system(macdeployqt_multiple_executables_command):
                 return False
 
             # macdeployqt might just have added some explicitly blacklisted files
