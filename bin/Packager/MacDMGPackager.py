@@ -53,16 +53,13 @@ class MacDMGPackager( CollectionPackagerBase ):
             if not dylibbundler.bundleLibraryDependencies(mainBinary):
                 return False
 
-            binaries = []
-            for root, dirs, files in os.walk(os.path.join(appPath, "Contents", "MacOS")):
-                for name in files:
-                    if utils.isBinary(os.path.join(root, name)):
-                        if defines['appname'] != name:
-                            binaries.append(name)
+            binaries = list(utils.filterDirectoryContent(os.path.join(appPath, "Contents", "MacOS"), 
+                whitelist=lambda x, root: utils.isBinary(os.path.join(root, x)) and x.name != defines["appname"],
+                blacklist=lambda x, root: x.name == defines["appname"]))
             
             for binary in binaries:
                 CraftCore.log.info(f"Bundling dependencies for {binary}...")
-                binaryPath = Path(appPath, "Contents", "MacOS", binary)
+                binaryPath = Path(binary)
                 if not dylibbundler.bundleLibraryDependencies(binaryPath):
                     return False
 
@@ -76,8 +73,7 @@ class MacDMGPackager( CollectionPackagerBase ):
 
             macdeployqt_multiple_executables_command = ["macdeployqt", appPath, "-always-overwrite", "-verbose=1"]
             for binary in binaries:
-                binaryPath = Path(appPath, "Contents", "MacOS", binary)
-                macdeployqt_multiple_executables_command.append(f"-executable={binaryPath}")
+                macdeployqt_multiple_executables_command.append(f"-executable={binary}")
             if not utils.system(macdeployqt_multiple_executables_command):
                 return False
 
@@ -108,7 +104,7 @@ class MacDMGPackager( CollectionPackagerBase ):
                 found_bad_dylib = True
                 CraftCore.log.error("Found bad library dependency in main binary %s", mainBinary)
             for binary in binaries:
-                binaryPath = Path(appPath, "Contents", "MacOS", binary)
+                binaryPath = Path(binary)
                 if not dylibbundler.areLibraryDepsOkay(binaryPath):
                     found_bad_dylib = True
                     CraftCore.log.error("Found bad library dependency in binary %s", binaryPath)
