@@ -53,6 +53,19 @@ class MacDMGPackager( CollectionPackagerBase ):
             if not dylibbundler.bundleLibraryDependencies(mainBinary):
                 return False
 
+            binaries = []
+            for root, dirs, files in os.walk(os.path.join(appPath, "Contents", "MacOS")):
+                for name in files:
+                    if utils.isBinary(os.path.join(root, name)):
+                        if defines['appname'] != name:
+                            binaries.append(name)
+            
+            for binary in binaries:
+                CraftCore.log.info(f"Bundling dependencies for {binary}...")
+                binaryPath = Path(appPath, "Contents", "MacOS", binary)
+                if not dylibbundler.bundleLibraryDependencies(binaryPath):
+                    return False
+
             # Fix up the library dependencies of files in Contents/Frameworks/
             CraftCore.log.info("Bundling library dependencies...")
             if not dylibbundler.fixupAndBundleLibsRecursively("Contents/Frameworks"):
@@ -90,6 +103,11 @@ class MacDMGPackager( CollectionPackagerBase ):
             if not dylibbundler.areLibraryDepsOkay(mainBinary):
                 found_bad_dylib = True
                 CraftCore.log.error("Found bad library dependency in main binary %s", mainBinary)
+            for binary in binaries:
+                binaryPath = Path(appPath, "Contents", "MacOS", binary)
+                if not dylibbundler.areLibraryDepsOkay(binaryPath):
+                    found_bad_dylib = True
+                    CraftCore.log.error("Found bad library dependency in binary %s", binaryPath)
             if not dylibbundler.checkLibraryDepsRecursively("Contents/Frameworks"):
                 CraftCore.log.error("Found bad library dependency in bundled libraries")
                 found_bad_dylib = True
@@ -312,7 +330,7 @@ class MacDylibBundler(object):
             if dep == libraryId and not os.path.isabs(libraryId):
                 continue  # non-absolute library id is fine
             # @rpath and @executable_path is fine
-            if dep.startswith("@rpath") or dep.startswith("@executable_path"):
+            if dep.startswith("@rpath") or dep.startswith("@executable_path") or dep.startswith("@loader_path"):
                 continue
             # Also allow /System/Library/Frameworks/ and /usr/lib:
             if dep.startswith("/usr/lib/") or dep.startswith("/System/Library/Frameworks/"):
